@@ -286,9 +286,9 @@ def plot_container_3d(ax, container: Container3D,
     # CRITICAL: Set true physical aspect ratio for 3D
     ax.set_box_aspect((container_l, container_w, container_h))
 
-    # Set limits
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(0, container_l)
-    ax.set_ylim(container_w, 0)  # Inverted for proper orientation
+    ax.set_ylim(0, container_w)
     ax.set_zlim(0, container_h)
 
     # Set view angle
@@ -322,9 +322,9 @@ def plot_container_2d_top_connected(ax, container: Container3D,
     # CRITICAL: Equal aspect ratio for true proportions
     ax.set_aspect('equal')
 
-    # Set limits
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(-container_l*0.01, container_l*1.01)
-    ax.set_ylim(container_w*1.01, -container_w*0.01)
+    ax.set_ylim(-container_w*0.01, container_w*1.01)
     ax.tick_params(labelsize=7)
     ax.grid(True, alpha=0.3, linestyle='--')
 
@@ -356,9 +356,9 @@ def plot_container_2d_front_connected(ax, container: Container3D,
     # CRITICAL: Equal aspect ratio for true proportions
     ax.set_aspect('equal')
 
-    # Set limits
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(-container_l*0.01, container_l*1.01)
-    ax.set_ylim(container_h*1.01, -container_h*0.01)
+    ax.set_ylim(-container_h*0.01, container_h*1.01)
     ax.tick_params(labelsize=7)
     ax.grid(True, alpha=0.3, linestyle='--')
 
@@ -390,9 +390,9 @@ def plot_container_2d_side_connected(ax, container: Container3D,
     # CRITICAL: Equal aspect ratio for true proportions
     ax.set_aspect('equal')
 
-    # Set limits
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(-container_w*0.01, container_w*1.01)
-    ax.set_ylim(container_h*1.01, -container_h*0.01)
+    ax.set_ylim(-container_h*0.01, container_h*1.01)
     ax.tick_params(labelsize=7)
     ax.grid(True, alpha=0.3, linestyle='--')
 
@@ -424,9 +424,9 @@ def plot_container_2d_top(ax, container: Container3D,
     # CRITICAL: Set equal aspect ratio for true physical proportions
     ax.set_aspect('equal')
 
-    # Set limits with some padding
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(-container_l*0.02, container_l*1.02)
-    ax.set_ylim(container_w*1.02, -container_w*0.02)  # Inverted Y for consistency with 3D
+    ax.set_ylim(-container_w*0.02, container_w*1.02)
     ax.tick_params(labelsize=8)
     ax.grid(True, alpha=0.3, linestyle='--')
 
@@ -458,9 +458,9 @@ def plot_container_2d_front(ax, container: Container3D,
     # CRITICAL: Set equal aspect ratio for true physical proportions
     ax.set_aspect('equal')
 
-    # Set limits with some padding
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(-container_l*0.02, container_l*1.02)
-    ax.set_ylim(container_h*1.02, -container_h*0.02)  # Inverted Z for consistency
+    ax.set_ylim(-container_h*0.02, container_h*1.02)
     ax.tick_params(labelsize=8)
     ax.grid(True, alpha=0.3, linestyle='--')
 
@@ -492,9 +492,9 @@ def plot_container_2d_side(ax, container: Container3D,
     # CRITICAL: Set equal aspect ratio for true physical proportions
     ax.set_aspect('equal')
 
-    # Set limits with some padding
+    # Set limits with normal orientation (0 at bottom)
     ax.set_xlim(-container_w*0.02, container_w*1.02)
-    ax.set_ylim(container_h*1.02, -container_h*0.02)  # Inverted Z for consistency
+    ax.set_ylim(-container_h*0.02, container_h*1.02)
     ax.tick_params(labelsize=8)
     ax.grid(True, alpha=0.3, linestyle='--')
 
