@@ -225,37 +225,37 @@ def plot_container_simple(ax, container: Container3D,
 def draw_box_edges(ax, x: float, y: float, z: float,
                   l: float, w: float, h: float,
                   color: str, alpha: float = 0.7):
-    """Draw a 3D box using edges."""
+    """Draw a 3D box with proper faces and edges."""
+
+    # Import Poly3DCollection for proper 3D polygon rendering
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
     # Define vertices
-    x_coords = [x, x + l, x + l, x, x, x + l, x + l, x]
-    y_coords = [y, y, y + w, y + w, y, y, y + w, y + w]
-    z_coords = [z, z, z, z, z + h, z + h, z + h, z + h]
+    vertices = [
+        [x, y, z],
+        [x + l, y, z],
+        [x + l, y + w, z],
+        [x, y + w, z],
+        [x, y, z + h],
+        [x + l, y, z + h],
+        [x + l, y + w, z + h],
+        [x, y + w, z + h]
+    ]
 
-    # Draw edges
-    # Bottom edges
-    ax.plot([x, x + l], [y, y], [z, z], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x + l, x + l], [y, y + w], [z, z], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x + l, x], [y + w, y + w], [z, z], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x, x], [y + w, y], [z, z], color=color, linewidth=1, alpha=alpha)
+    # Define faces (6 faces of the box)
+    faces = [
+        [vertices[0], vertices[1], vertices[5], vertices[4]],  # Front
+        [vertices[2], vertices[3], vertices[7], vertices[6]],  # Back
+        [vertices[0], vertices[3], vertices[7], vertices[4]],  # Left
+        [vertices[1], vertices[2], vertices[6], vertices[5]],  # Right
+        [vertices[0], vertices[1], vertices[2], vertices[3]],  # Bottom
+        [vertices[4], vertices[5], vertices[6], vertices[7]],  # Top
+    ]
 
-    # Top edges
-    ax.plot([x, x + l], [y, y], [z + h, z + h], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x + l, x + l], [y, y + w], [z + h, z + h], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x + l, x], [y + w, y + w], [z + h, z + h], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x, x], [y + w, y], [z + h, z + h], color=color, linewidth=1, alpha=alpha)
-
-    # Vertical edges
-    ax.plot([x, x], [y, y], [z, z + h], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x + l, x + l], [y, y], [z, z + h], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x + l, x + l], [y + w, y + w], [z, z + h], color=color, linewidth=1, alpha=alpha)
-    ax.plot([x, x], [y + w, y + w], [z, z + h], color=color, linewidth=1, alpha=alpha)
-
-    # Draw faces using scatter for semi-transparent fill
-    # Bottom face
-    ax.scatter([x + l/2], [y + w/2], [z], color=color, alpha=alpha*0.3, s=l*w*10)
-    # Top face
-    ax.scatter([x + l/2], [y + w/2], [z + h], color=color, alpha=alpha*0.3, s=l*w*10)
+    # Draw filled faces with transparency
+    face_poly = Poly3DCollection(faces, alpha=alpha*0.4, facecolors=color,
+                                 edgecolors=color, linewidths=1.5)
+    ax.add_collection3d(face_poly)
 
 
 def get_item_color(item_name: str) -> str:
