@@ -141,11 +141,16 @@ def create_3d_visualization(containers: list[Container3D],
 
     # Process each container
     for container_idx, container in enumerate(containers, 1):
-        fig = plt.figure(figsize=(20, 12))
+        # Larger figure with better aspect ratio
+        fig = plt.figure(figsize=(24, 16))
+
+        # Add more space at top for title
+        fig.subplots_adjust(top=0.90, bottom=0.12, left=0.05, right=0.95, hspace=0.3, wspace=0.2)
+
         fig.suptitle(f'Container {container_idx} - {len(container.placed_items)} Items '
                     f'({container.volume_utilization:.1f}% Full, '
                     f'{sum(p.item.weight for p in container.placed_items):.0f} kg)',
-                    fontsize=16, fontweight='bold')
+                    fontsize=18, fontweight='bold', y=0.98)
 
         # Create 4 subplots
         views = [
@@ -159,19 +164,18 @@ def create_3d_visualization(containers: list[Container3D],
             ax = fig.add_subplot(2, 2, subplot_idx, projection='3d')
             plot_container_simple(ax, container, container_l, container_w, container_h, elev, azim, view_name)
 
-        # Add legend
+        # Add legend with better positioning
         legend_elements = [
             mpatches.Patch(color=BED_FRAMES["SINGLE"]["color"], label='Single Bed Frame'),
             mpatches.Patch(color=BED_FRAMES["DOUBLE"]["color"], label='Double Bed Frame'),
             mpatches.Patch(color=BED_FRAMES["KING"]["color"], label='King Bed Frame'),
             mpatches.Patch(color=BED_FRAMES["HEADBOARD"]["color"], label='Headboard'),
         ]
-        fig.legend(handles=legend_elements, loc='lower center', ncol=4, fontsize=10)
-
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.02),
+                  ncol=4, fontsize=12, frameon=True, shadow=True)
 
         output_file = os.path.join(output_folder, f'container_{container_idx}_3d_views.png')
-        plt.savefig(output_file, dpi=150, bbox_inches='tight')
+        plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.2)
         plt.close()
 
         print(f"✓ 3D visualization saved to: {output_file}")
@@ -201,11 +205,16 @@ def plot_container_simple(ax, container: Container3D,
         draw_box_edges(ax, placed.x, placed.y, placed.z,
                       placed.length, placed.width, placed.height, color)
 
-    # Set labels and title
-    ax.set_xlabel('Length (cm)')
-    ax.set_ylabel('Width (cm)')
-    ax.set_zlabel('Height (cm)')
-    ax.set_title(title)
+    # Set labels and title with larger fonts
+    ax.set_xlabel('Length (cm)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Width (cm)', fontsize=12, fontweight='bold')
+    ax.set_zlabel('Height (cm)', fontsize=12, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=10)
+
+    # Set tick label sizes
+    ax.tick_params(axis='x', labelsize=10)
+    ax.tick_params(axis='y', labelsize=10)
+    ax.tick_params(axis='z', labelsize=10)
 
     # Set aspect ratio
     ax.set_box_aspect([container_l, container_w, container_h])
