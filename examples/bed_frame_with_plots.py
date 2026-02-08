@@ -18,6 +18,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from improved_3d_bin_packing import Item3D, improved_3d_packing, Container3D, PlacedItem
 
+# Import matplotlib here for 2D patches
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend
+    import matplotlib.pyplot as plt
+    import matplotlib.patches
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.patches as mpatches
+except ImportError:
+    matplotlib = None
+
 # Container sizes (in cm)
 CONTAINER_20FT = (589, 235, 239)
 CONTAINER_40FT = (1200, 235, 239)
@@ -121,122 +132,233 @@ def save_results_to_file(containers: list[Container3D],
 def create_3d_visualization(containers: list[Container3D],
                             container_dims: tuple,
                             output_folder: str):
-    """Create 3D visualization plots from multiple views."""
+    """Create 3D visualization plots from multiple views with proper aspect ratios."""
 
-    try:
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-interactive backend
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
-        import matplotlib.patches as mpatches
-    except ImportError:
+    if matplotlib is None:
         print("⚠️  Matplotlib not installed. Skipping visualization.")
         print("   Install with: pip install matplotlib")
         return
 
     container_l, container_w, container_h = container_dims
 
+    # Calculate figure size based on container aspect ratio
+    # Keep width around 14-15 inches, scale height accordingly
+    base_width = 14
+    aspect_ratio = (container_w + container_h) / (container_l + container_w)
+    fig_height = base_width * aspect_ratio * 0.8  # Adjust for layout
+
     # Create output folder if it doesn't exist
     os.makedirs(output_folder, exist_ok=True)
 
     # Process each container
     for container_idx, container in enumerate(containers, 1):
-        # Larger figure with better aspect ratio
-        fig = plt.figure(figsize=(24, 16))
+        # Create figure with constrained layout
+        fig = plt.figure(figsize=(base_width, fig_height), layout='constrained')
 
-        # Add more space at top for title
-        fig.subplots_adjust(top=0.90, bottom=0.12, left=0.05, right=0.95, hspace=0.3, wspace=0.2)
-
+        # Main title
         fig.suptitle(f'Container {container_idx} - {len(container.placed_items)} Items '
                     f'({container.volume_utilization:.1f}% Full, '
                     f'{sum(p.item.weight for p in container.placed_items):.0f} kg)',
-                    fontsize=18, fontweight='bold', y=0.98)
+                    fontsize=14, fontweight='bold')
 
-        # Create 4 subplots
-        views = [
-            (1, "Isometric View (3D)", 20, 45),
-            (2, "Top View", 90, -90),
-            (3, "Front View", 0, -90),
-            (4, "Side View", 0, 0),
-        ]
+        # Create subplots grid: 2x2
+        # Isometric (3D), Top (2D), Front (2D), Side (2D)
+        gs = fig.add_gridspec(2, 2, hspace=0.15, wspace=0.15)
 
-        for subplot_idx, view_name, elev, azim in views:
-            ax = fig.add_subplot(2, 2, subplot_idx, projection='3d')
-            plot_container_simple(ax, container, container_l, container_w, container_h, elev, azim, view_name)
+        # 1. Isometric 3D View
+        ax1 = fig.add_subplot(gs[0, 0], projection='3d')
+        plot_container_3d(ax1, container, container_l, container_w, container_h,
+                         elev=20, azim=45, title="Isometric View (3D)")
 
-        # Add legend with better positioning
+        # 2. Top View (2D - looking down from Z)
+        ax2 = fig.add_subplot(gs[0, 1])
+        plot_container_2d_top(ax2, container, container_l, container_w, container_h,
+                             title="Top View")
+
+        # 3. Front View (2D - looking from Y)
+        ax3 = fig.add_subplot(gs[1, 0])
+        plot_container_2d_front(ax3, container, container_l, container_w, container_h,
+                               title="Front View")
+
+        # 4. Side View (2D - looking from X)
+        ax4 = fig.add_subplot(gs[1, 1])
+        plot_container_2d_side(ax4, container, container_l, container_w, container_h,
+                              title="Side View")
+
+        # Add legend at bottom
         legend_elements = [
             mpatches.Patch(color=BED_FRAMES["SINGLE"]["color"], label='Single Bed Frame'),
             mpatches.Patch(color=BED_FRAMES["DOUBLE"]["color"], label='Double Bed Frame'),
             mpatches.Patch(color=BED_FRAMES["KING"]["color"], label='King Bed Frame'),
             mpatches.Patch(color=BED_FRAMES["HEADBOARD"]["color"], label='Headboard'),
         ]
-        fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.02),
-                  ncol=4, fontsize=12, frameon=True, shadow=True)
+        fig.legend(handles=legend_elements, loc='outside lower center',
+                  ncol=4, fontsize=10, frameon=True)
 
         output_file = os.path.join(output_folder, f'container_{container_idx}_3d_views.png')
-        plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.2)
+        plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
         print(f"✓ 3D visualization saved to: {output_file}")
 
 
-def plot_container_simple(ax, container: Container3D,
-                         container_l: float, container_w: float, container_h: float,
-                         elev: int, azim: int, title: str):
-    """Plot a single 3D view of the container using simple approach."""
+def plot_container_3d(ax, container: Container3D,
+                      container_l: float, container_w: float, container_h: float,
+                      elev: int, azim: int, title: str):
+    """Plot 3D isometric view with proper box aspect ratio."""
 
-    # Draw container wireframe using lines
-    # Bottom face
-    ax.plot([0, container_l, container_l, 0, 0], [0, 0, container_w, container_w, 0], [0, 0, 0, 0, 0], 'k-', linewidth=2, alpha=0.5)
-    # Top face
-    ax.plot([0, container_l, container_l, 0, 0], [0, 0, container_w, container_w, 0], [container_h, container_h, container_h, container_h, container_h], 'k-', linewidth=2, alpha=0.5)
-    # Vertical edges
-    ax.plot([0, 0], [0, 0], [0, container_h], 'k-', linewidth=2, alpha=0.5)
-    ax.plot([container_l, container_l], [0, 0], [0, container_h], 'k-', linewidth=2, alpha=0.5)
-    ax.plot([container_l, container_l], [container_w, container_w], [0, container_h], 'k-', linewidth=2, alpha=0.5)
-    ax.plot([0, 0], [container_w, container_w], [0, container_h], 'k-', linewidth=2, alpha=0.5)
+    # Draw container wireframe
+    draw_container_wireframe_3d(ax, container_l, container_w, container_h)
 
-    # Draw items using bar3d
-    from mpl_toolkits.mplot3d import Axes3D
+    # Draw items
     for placed in container.placed_items:
         color = get_item_color(placed.item.name)
-        # Draw as a 3D box
-        draw_box_edges(ax, placed.x, placed.y, placed.z,
-                      placed.length, placed.width, placed.height, color)
+        draw_box_3d(ax, placed.x, placed.y, placed.z,
+                   placed.length, placed.width, placed.height, color)
 
-    # Set labels and title with larger fonts
-    ax.set_xlabel('Length (cm)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Width (cm)', fontsize=12, fontweight='bold')
-    ax.set_zlabel('Height (cm)', fontsize=12, fontweight='bold')
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=10)
+    # Set labels and title
+    ax.set_xlabel('Length (cm)', fontsize=10, fontweight='bold')
+    ax.set_ylabel('Width (cm)', fontsize=10, fontweight='bold')
+    ax.set_zlabel('Height (cm)', fontsize=10, fontweight='bold')
+    ax.set_title(title, fontsize=11, fontweight='bold', pad=5)
 
-    # Set tick label sizes
-    ax.tick_params(axis='x', labelsize=10)
-    ax.tick_params(axis='y', labelsize=10)
-    ax.tick_params(axis='z', labelsize=10)
+    # Set tick params
+    ax.tick_params(axis='x', labelsize=8)
+    ax.tick_params(axis='y', labelsize=8)
+    ax.tick_params(axis='z', labelsize=8)
 
-    # Set aspect ratio
-    ax.set_box_aspect([container_l, container_w, container_h])
+    # CRITICAL: Set true physical aspect ratio for 3D
+    ax.set_box_aspect((container_l, container_w, container_h))
 
     # Set limits
     ax.set_xlim(0, container_l)
-    ax.set_ylim(0, container_w)
+    ax.set_ylim(container_w, 0)  # Inverted for proper orientation
     ax.set_zlim(0, container_h)
 
     # Set view angle
     ax.view_init(elev=elev, azim=azim)
 
-    # Invert y-axis
-    ax.invert_yaxis()
+
+def plot_container_2d_top(ax, container: Container3D,
+                          container_l: float, container_w: float, container_h: float,
+                          title: str):
+    """Plot top-down 2D view (X-Y plane)."""
+
+    # Draw container outline
+    rect = matplotlib.patches.Rectangle((0, 0), container_l, container_w,
+                                       fill=False, edgecolor='black', linewidth=2)
+    ax.add_patch(rect)
+
+    # Draw items (showing X and Y dimensions)
+    for placed in container.placed_items:
+        color = get_item_color(placed.item.name)
+        rect = matplotlib.patches.Rectangle(
+            (placed.x, placed.y), placed.length, placed.width,
+            linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+        )
+        ax.add_patch(rect)
+
+    # Set labels and title
+    ax.set_xlabel('Length (cm)', fontsize=10, fontweight='bold')
+    ax.set_ylabel('Width (cm)', fontsize=10, fontweight='bold')
+    ax.set_title(title, fontsize=11, fontweight='bold', pad=5)
+
+    # CRITICAL: Set equal aspect ratio for true physical proportions
+    ax.set_aspect('equal')
+
+    # Set limits with some padding
+    ax.set_xlim(-container_l*0.02, container_l*1.02)
+    ax.set_ylim(container_w*1.02, -container_w*0.02)  # Inverted Y for consistency with 3D
+    ax.tick_params(labelsize=8)
+    ax.grid(True, alpha=0.3, linestyle='--')
 
 
-def draw_box_edges(ax, x: float, y: float, z: float,
-                  l: float, w: float, h: float,
-                  color: str, alpha: float = 0.7):
+def plot_container_2d_front(ax, container: Container3D,
+                            container_l: float, container_w: float, container_h: float,
+                            title: str):
+    """Plot front 2D view (X-Z plane)."""
+
+    # Draw container outline
+    rect = matplotlib.patches.Rectangle((0, 0), container_l, container_h,
+                                       fill=False, edgecolor='black', linewidth=2)
+    ax.add_patch(rect)
+
+    # Draw items (showing X and Z dimensions)
+    for placed in container.placed_items:
+        color = get_item_color(placed.item.name)
+        rect = matplotlib.patches.Rectangle(
+            (placed.x, placed.z), placed.length, placed.height,
+            linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+        )
+        ax.add_patch(rect)
+
+    # Set labels and title
+    ax.set_xlabel('Length (cm)', fontsize=10, fontweight='bold')
+    ax.set_ylabel('Height (cm)', fontsize=10, fontweight='bold')
+    ax.set_title(title, fontsize=11, fontweight='bold', pad=5)
+
+    # CRITICAL: Set equal aspect ratio for true physical proportions
+    ax.set_aspect('equal')
+
+    # Set limits with some padding
+    ax.set_xlim(-container_l*0.02, container_l*1.02)
+    ax.set_ylim(container_h*1.02, -container_h*0.02)  # Inverted Z for consistency
+    ax.tick_params(labelsize=8)
+    ax.grid(True, alpha=0.3, linestyle='--')
+
+
+def plot_container_2d_side(ax, container: Container3D,
+                           container_l: float, container_w: float, container_h: float,
+                           title: str):
+    """Plot side 2D view (Y-Z plane)."""
+
+    # Draw container outline
+    rect = matplotlib.patches.Rectangle((0, 0), container_w, container_h,
+                                       fill=False, edgecolor='black', linewidth=2)
+    ax.add_patch(rect)
+
+    # Draw items (showing Y and Z dimensions)
+    for placed in container.placed_items:
+        color = get_item_color(placed.item.name)
+        rect = matplotlib.patches.Rectangle(
+            (placed.y, placed.z), placed.width, placed.height,
+            linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+        )
+        ax.add_patch(rect)
+
+    # Set labels and title
+    ax.set_xlabel('Width (cm)', fontsize=10, fontweight='bold')
+    ax.set_ylabel('Height (cm)', fontsize=10, fontweight='bold')
+    ax.set_title(title, fontsize=11, fontweight='bold', pad=5)
+
+    # CRITICAL: Set equal aspect ratio for true physical proportions
+    ax.set_aspect('equal')
+
+    # Set limits with some padding
+    ax.set_xlim(-container_w*0.02, container_w*1.02)
+    ax.set_ylim(container_h*1.02, -container_h*0.02)  # Inverted Z for consistency
+    ax.tick_params(labelsize=8)
+    ax.grid(True, alpha=0.3, linestyle='--')
+
+
+def draw_container_wireframe_3d(ax, l: float, w: float, h: float):
+    """Draw container wireframe in 3D."""
+    # Bottom face
+    ax.plot([0, l, l, 0, 0], [0, 0, w, w, 0], [0, 0, 0, 0, 0], 'k-', linewidth=2, alpha=0.5)
+    # Top face
+    ax.plot([0, l, l, 0, 0], [0, 0, w, w, 0], [h, h, h, h, h], 'k-', linewidth=2, alpha=0.5)
+    # Vertical edges
+    ax.plot([0, 0], [0, 0], [0, h], 'k-', linewidth=2, alpha=0.5)
+    ax.plot([l, l], [0, 0], [0, h], 'k-', linewidth=2, alpha=0.5)
+    ax.plot([l, l], [w, w], [0, h], 'k-', linewidth=2, alpha=0.5)
+    ax.plot([0, 0], [w, w], [0, h], 'k-', linewidth=2, alpha=0.5)
+
+
+def draw_box_3d(ax, x: float, y: float, z: float,
+               l: float, w: float, h: float,
+               color: str, alpha: float = 0.7):
     """Draw a 3D box with proper faces and edges."""
 
-    # Import Poly3DCollection for proper 3D polygon rendering
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
     # Define vertices
