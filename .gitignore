@@ -71,8 +71,11 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
+# Ignore general results but allow example results
 results/
+!examples/results/
 *.png
+!examples/results/visualizations/*.png
 *.jpg
 *.jpeg
 *.pdf
