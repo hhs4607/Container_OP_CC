@@ -132,7 +132,7 @@ def save_results_to_file(containers: list[Container3D],
 def create_3d_visualization(containers: list[Container3D],
                             container_dims: tuple,
                             output_folder: str):
-    """Create 3D visualization plots from multiple views with proper aspect ratios."""
+    """Create two separate figure files: 3D Isometric View and Orthographic Projection."""
 
     if matplotlib is None:
         print("⚠️  Matplotlib not installed. Skipping visualization.")
@@ -141,65 +141,121 @@ def create_3d_visualization(containers: list[Container3D],
 
     container_l, container_w, container_h = container_dims
 
-    # Calculate figure size based on container aspect ratio
-    # Keep width around 14-15 inches, scale height accordingly
-    base_width = 14
-    aspect_ratio = (container_w + container_h) / (container_l + container_w)
-    fig_height = base_width * aspect_ratio * 0.8  # Adjust for layout
-
     # Create output folder if it doesn't exist
     os.makedirs(output_folder, exist_ok=True)
 
     # Process each container
     for container_idx, container in enumerate(containers, 1):
-        # Create figure with constrained layout
-        fig = plt.figure(figsize=(base_width, fig_height), layout='constrained')
+        # ========================================
+        # FIGURE A: 3D Isometric View (Standalone)
+        # ========================================
+        create_figure_3d_isometric(container, container_idx, container_l, container_w, container_h, output_folder)
 
-        # Main title
-        fig.suptitle(f'Container {container_idx} - {len(container.placed_items)} Items '
-                    f'({container.volume_utilization:.1f}% Full, '
-                    f'{sum(p.item.weight for p in container.placed_items):.0f} kg)',
-                    fontsize=14, fontweight='bold')
+        # ========================================
+        # FIGURE B: Orthographic Projection (2D Connected Views)
+        # ========================================
+        create_figure_orthographic(container, container_idx, container_l, container_w, container_h, output_folder)
 
-        # Create subplots grid: 2x2
-        # Isometric (3D), Top (2D), Front (2D), Side (2D)
-        gs = fig.add_gridspec(2, 2, hspace=0.15, wspace=0.15)
 
-        # 1. Isometric 3D View
-        ax1 = fig.add_subplot(gs[0, 0], projection='3d')
-        plot_container_3d(ax1, container, container_l, container_w, container_h,
-                         elev=20, azim=45, title="Isometric View (3D)")
+def create_figure_3d_isometric(container: Container3D, container_idx: int,
+                                container_l: float, container_w: float, container_h: float,
+                                output_folder: str):
+    """Create standalone 3D isometric view figure."""
 
-        # 2. Top View (2D - looking down from Z)
-        ax2 = fig.add_subplot(gs[0, 1])
-        plot_container_2d_top(ax2, container, container_l, container_w, container_h,
-                             title="Top View")
+    # Calculate figure size based on container's longest dimension
+    max_dim = max(container_l, container_w, container_h)
+    figsize = max_dim / 50  # Scale: 50cm per inch
 
-        # 3. Front View (2D - looking from Y)
-        ax3 = fig.add_subplot(gs[1, 0])
-        plot_container_2d_front(ax3, container, container_l, container_w, container_h,
-                               title="Front View")
+    fig = plt.figure(figsize=(figsize, figsize * 0.75))
+    fig.suptitle(f'Container {container_idx} - 3D Isometric View\n'
+                f'{len(container.placed_items)} Items ({container.volume_utilization:.1f}% Full, '
+                f'{sum(p.item.weight for p in container.placed_items):.0f} kg)',
+                fontsize=12, fontweight='bold')
 
-        # 4. Side View (2D - looking from X)
-        ax4 = fig.add_subplot(gs[1, 1])
-        plot_container_2d_side(ax4, container, container_l, container_w, container_h,
-                              title="Side View")
+    ax = fig.add_subplot(111, projection='3d')
+    plot_container_3d(ax, container, container_l, container_w, container_h,
+                     elev=20, azim=45, title="")
 
-        # Add legend at bottom
-        legend_elements = [
-            mpatches.Patch(color=BED_FRAMES["SINGLE"]["color"], label='Single Bed Frame'),
-            mpatches.Patch(color=BED_FRAMES["DOUBLE"]["color"], label='Double Bed Frame'),
-            mpatches.Patch(color=BED_FRAMES["KING"]["color"], label='King Bed Frame'),
-            mpatches.Patch(color=BED_FRAMES["HEADBOARD"]["color"], label='Headboard'),
-        ]
-        fig.legend(handles=legend_elements, loc='outside lower center',
-                  ncol=4, fontsize=10, frameon=True)
+    # Add legend
+    legend_elements = [
+        mpatches.Patch(color=BED_FRAMES["SINGLE"]["color"], label='Single Bed Frame'),
+        mpatches.Patch(color=BED_FRAMES["DOUBLE"]["color"], label='Double Bed Frame'),
+        mpatches.Patch(color=BED_FRAMES["KING"]["color"], label='King Bed Frame'),
+        mpatches.Patch(color=BED_FRAMES["HEADBOARD"]["color"], label='Headboard'),
+    ]
+    fig.legend(handles=legend_elements, loc='outside lower center',
+              ncol=4, fontsize=9, frameon=True)
 
-        output_file = os.path.join(output_folder, f'container_{container_idx}_3d_views.png')
-        plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
-        plt.close()
+    output_file = os.path.join(output_folder, f'container_{container_idx}_isometric_3d.png')
+    plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
+    plt.close()
+    print(f"✓ 3D Isometric view saved to: {output_file}")
 
-        print(f"✓ 3D visualization saved to: {output_file}")
+
+def create_figure_orthographic(container: Container3D, container_idx: int,
+                               container_l: float, container_w: float, container_h: float,
+                               output_folder: str):
+    """Create orthographic projection with connected 2D views (technical drawing style)."""
+
+    # Calculate figure size to maintain aspect ratio
+    # Layout is 2x2: Top View + Legend on top row, Front + Side on bottom row
+    # Width driven by Length (Top/Front) + Width (Side)
+    # Height driven by Width (Top) + Height (Front/Side)
+
+    width_ratio = (container_l + container_w) / max(container_l, container_w, container_h)
+    height_ratio = (container_w + container_h) / max(container_l, container_w, container_h)
+
+    base_size = 12
+    fig_width = base_size * width_ratio
+    fig_height = base_size * height_ratio
+
+    fig = plt.figure(figsize=(fig_width, fig_height), layout='constrained')
+    fig.suptitle(f'Container {container_idx} - Orthographic Projection\n'
+                f'{len(container.placed_items)} Items ({container.volume_utilization:.1f}% Full)',
+                fontsize=11, fontweight='bold')
+
+    # Create 2x2 grid with minimal spacing for "connected" look
+    # Layout:
+    #   Top-Left (ax1): Top View (Length vs Width)
+    #   Top-Right (ax2): Legend (empty plot for legend)
+    #   Bottom-Left (ax3): Front View (Length vs Height) - shares X with Top View
+    #   Bottom-Right (ax4): Side View (Width vs Height) - shares Y with Front View
+
+    gs = fig.add_gridspec(2, 2, hspace=0.05, wspace=0.05,
+                          height_ratios=[container_w, container_h],
+                          width_ratios=[container_l, container_w])
+
+    # Top-Left: Top View (Length vs Width)
+    ax1 = fig.add_subplot(gs[0, 0])
+    plot_container_2d_top_connected(ax1, container, container_l, container_w, container_h,
+                                    title="Top View (X-Y Plane)")
+
+    # Top-Right: Legend area
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2.axis('off')
+    legend_elements = [
+        mpatches.Patch(color=BED_FRAMES["SINGLE"]["color"], label='Single Bed Frame'),
+        mpatches.Patch(color=BED_FRAMES["DOUBLE"]["color"], label='Double Bed Frame'),
+        mpatches.Patch(color=BED_FRAMES["KING"]["color"], label='King Bed Frame'),
+        mpatches.Patch(color=BED_FRAMES["HEADBOARD"]["color"], label='Headboard'),
+    ]
+    ax2.legend(handles=legend_elements, loc='center', fontsize=9,
+               frameon=True, shadow=True)
+
+    # Bottom-Left: Front View (Length vs Height) - shares X-axis with Top View
+    ax3 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    plot_container_2d_front_connected(ax3, container, container_l, container_w, container_h,
+                                      title="Front View (X-Z Plane)")
+
+    # Bottom-Right: Side View (Width vs Height) - shares Y-axis with Front View
+    ax4 = fig.add_subplot(gs[1, 1])
+    plot_container_2d_side_connected(ax4, container, container_l, container_w, container_h,
+                                     title="Side View (Y-Z Plane)")
+
+    output_file = os.path.join(output_folder, f'container_{container_idx}_orthographic_2d.png')
+    plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
+    plt.close()
+    print(f"✓ Orthographic 2D view saved to: {output_file}")
 
 
 def plot_container_3d(ax, container: Container3D,
@@ -237,6 +293,108 @@ def plot_container_3d(ax, container: Container3D,
 
     # Set view angle
     ax.view_init(elev=elev, azim=azim)
+
+
+def plot_container_2d_top_connected(ax, container: Container3D,
+                                    container_l: float, container_w: float, container_h: float,
+                                    title: str):
+    """Plot top-down 2D view with connected layout styling."""
+
+    # Draw container outline
+    rect = matplotlib.patches.Rectangle((0, 0), container_l, container_w,
+                                       fill=False, edgecolor='black', linewidth=2)
+    ax.add_patch(rect)
+
+    # Draw items
+    for placed in container.placed_items:
+        color = get_item_color(placed.item.name)
+        rect = matplotlib.patches.Rectangle(
+            (placed.x, placed.y), placed.length, placed.width,
+            linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+        )
+        ax.add_patch(rect)
+
+    # Labels
+    ax.set_xlabel('Length (cm)', fontsize=9, fontweight='bold')
+    ax.set_ylabel('Width (cm)', fontsize=9, fontweight='bold')
+    ax.set_title(title, fontsize=10, fontweight='bold', pad=2)
+
+    # CRITICAL: Equal aspect ratio for true proportions
+    ax.set_aspect('equal')
+
+    # Set limits
+    ax.set_xlim(-container_l*0.01, container_l*1.01)
+    ax.set_ylim(container_w*1.01, -container_w*0.01)
+    ax.tick_params(labelsize=7)
+    ax.grid(True, alpha=0.3, linestyle='--')
+
+
+def plot_container_2d_front_connected(ax, container: Container3D,
+                                     container_l: float, container_w: float, container_h: float,
+                                     title: str):
+    """Plot front 2D view with connected layout styling."""
+
+    # Draw container outline
+    rect = matplotlib.patches.Rectangle((0, 0), container_l, container_h,
+                                       fill=False, edgecolor='black', linewidth=2)
+    ax.add_patch(rect)
+
+    # Draw items
+    for placed in container.placed_items:
+        color = get_item_color(placed.item.name)
+        rect = matplotlib.patches.Rectangle(
+            (placed.x, placed.z), placed.length, placed.height,
+            linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+        )
+        ax.add_patch(rect)
+
+    # Labels
+    ax.set_xlabel('Length (cm)', fontsize=9, fontweight='bold')
+    ax.set_ylabel('Height (cm)', fontsize=9, fontweight='bold')
+    ax.set_title(title, fontsize=10, fontweight='bold', pad=2)
+
+    # CRITICAL: Equal aspect ratio for true proportions
+    ax.set_aspect('equal')
+
+    # Set limits
+    ax.set_xlim(-container_l*0.01, container_l*1.01)
+    ax.set_ylim(container_h*1.01, -container_h*0.01)
+    ax.tick_params(labelsize=7)
+    ax.grid(True, alpha=0.3, linestyle='--')
+
+
+def plot_container_2d_side_connected(ax, container: Container3D,
+                                    container_l: float, container_w: float, container_h: float,
+                                    title: str):
+    """Plot side 2D view with connected layout styling."""
+
+    # Draw container outline
+    rect = matplotlib.patches.Rectangle((0, 0), container_w, container_h,
+                                       fill=False, edgecolor='black', linewidth=2)
+    ax.add_patch(rect)
+
+    # Draw items
+    for placed in container.placed_items:
+        color = get_item_color(placed.item.name)
+        rect = matplotlib.patches.Rectangle(
+            (placed.y, placed.z), placed.width, placed.height,
+            linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+        )
+        ax.add_patch(rect)
+
+    # Labels
+    ax.set_xlabel('Width (cm)', fontsize=9, fontweight='bold')
+    ax.set_ylabel('Height (cm)', fontsize=9, fontweight='bold')
+    ax.set_title(title, fontsize=10, fontweight='bold', pad=2)
+
+    # CRITICAL: Equal aspect ratio for true proportions
+    ax.set_aspect('equal')
+
+    # Set limits
+    ax.set_xlim(-container_w*0.01, container_w*1.01)
+    ax.set_ylim(container_h*1.01, -container_h*0.01)
+    ax.tick_params(labelsize=7)
+    ax.grid(True, alpha=0.3, linestyle='--')
 
 
 def plot_container_2d_top(ax, container: Container3D,
